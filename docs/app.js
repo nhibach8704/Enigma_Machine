@@ -11,23 +11,20 @@ const KEYBOARD_ROWS = [
   ".,?!()[]",
   "{}:;-'",
 ];
-const EXTENDED_ROTOR_SUFFIX = SPECIAL_CHARACTERS;
-const EXTENDED_REFLECTOR_SUFFIX = ",.!?)(][}{;:'-";
-
 const ROTORS = {
-  I: { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ" + EXTENDED_ROTOR_SUFFIX, notch: "Q" },
-  II: { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE" + EXTENDED_ROTOR_SUFFIX, notch: "E" },
-  III: { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO" + EXTENDED_ROTOR_SUFFIX, notch: "V" },
-  IV: { wiring: "ESOVPZJAYQUIRHXLNFTGKDCMWB" + EXTENDED_ROTOR_SUFFIX, notch: "J" },
-  V: { wiring: "VZBRGITYUPSDNHLXAWMJQOFECK" + EXTENDED_ROTOR_SUFFIX, notch: "Z" },
+  I: { wiring: "})HR:NPC{[!JV(D]'X-,?WKG.;OUILFYTEZBQMAS", notch: "Q" },
+  II: { wiring: "'.MWH}!);,Z:TC-U{]ERKO(?J[PGFSBLYDXVANIQ", notch: "E" },
+  III: { wiring: "]E!W?-'}[VFCIA).N{P;:,XB(TGOYUHSKMQZRDJL", notch: "V" },
+  IV: { wiring: "'U[V-}AN{KB:;J()WOX,!Z?.G]PCLHTYSREMIQFD", notch: "J" },
+  V: { wiring: ".!I[?HA}),{KOFE:XW-LC]';(UYQMVSGZBPTJDRN", notch: "Z" },
 };
 
 const CUSTOM_ROTOR_IDS = ["CUSTOM_LEFT", "CUSTOM_MIDDLE", "CUSTOM_RIGHT"];
 const POSITION_NAMES = ["Left", "Middle", "Right"];
 
 const REFLECTORS = {
-  B: "YRUHQSLDPXNGOKMIEBFZCWVJAT" + EXTENDED_REFLECTOR_SUFFIX,
-  C: "FVPJIAOYEDRZXWGCTKUQSBNMHL" + EXTENDED_REFLECTOR_SUFFIX,
+  B: "];S{)PM(.,-UG?YF[!CZL:'}OTIJNRHEQADXVBKW",
+  C: ".G(R!MB,:ZN?FK-){D[V;T']}JAHLECPSXQYIUOW",
 };
 
 const DEFAULT_PLUGBOARD_PAIRS = [
@@ -50,9 +47,9 @@ const DEFAULTS = {
   reflector: "B",
   turnover: true,
   customRotors: [
-    { wiring: ALPHABET, notch: "", valid: true, error: "" },
-    { wiring: ALPHABET, notch: "E", valid: true, error: "" },
-    { wiring: ALPHABET, notch: "V", valid: true, error: "" },
+    { wiring: ROTORS.I.wiring, notch: "", valid: true, error: "" },
+    { wiring: ROTORS.II.wiring, notch: "E", valid: true, error: "" },
+    { wiring: ROTORS.III.wiring, notch: "V", valid: true, error: "" },
   ],
   customReflector: {
     pairs: pairsFromWiring(REFLECTORS.B),

@@ -62,43 +62,8 @@ input:focus-visible {
   justify-content: space-between;
 }
 
-.brand {
-  display: flex;
-  gap: 12px;
-  align-items: center;
-  color: inherit;
-  text-decoration: none;
-  letter-spacing: 0.08em;
-}
-
-.brand-mark {
-  width: 42px;
-  height: 42px;
-  display: grid;
-  place-items: center;
-  border: 1px solid var(--ink);
-  border-radius: 50%;
-  font: italic 25px Georgia, serif;
-}
-
-.brand strong,
-.brand small {
-  display: block;
-}
-
-.brand strong {
-  font-size: 13px;
-  letter-spacing: 0.22em;
-}
-
-.brand small {
-  margin-top: 3px;
-  color: var(--muted);
-  font-size: 9px;
-  letter-spacing: 0.12em;
-}
-
 .header-note {
+  margin-left: auto;
   display: flex;
   align-items: center;
   gap: 10px;
