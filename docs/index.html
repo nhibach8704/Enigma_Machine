@@ -5,12 +5,12 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="An interactive modulo-40 Enigma simulator with special characters, preserved spaces, and an extended plugboard."
+      content="An interactive modulo-50 Enigma simulator with letters, numbers, special characters, preserved spaces, and an extended plugboard."
     />
     <meta name="theme-color" content="#171916" />
     <title>Enigma Model I Simulator</title>
-    <link rel="stylesheet" href="styles.css?v=20260811-4" />
-    <script src="app.js?v=20260811-5" defer></script>
+    <link rel="stylesheet" href="styles.css?v=20260811-5" />
+    <script src="app.js?v=20260811-8" defer></script>
   </head>
   <body>
     <header class="site-header">
@@ -28,7 +28,7 @@
         </div>
         <p class="intro-copy">
           Configure three rotors, set their rings and starting positions,
-          connect the plugboard, then type letters or punctuation. The same
+          connect the plugboard, then type letters, numbers, or punctuation. The same
           settings decipher what they encipher; spaces stay in place without stepping.
         </p>
       </section>
@@ -102,15 +102,15 @@
               <p class="eyebrow">Entry &amp; return mapping</p>
               <h3 id="plugboardLabTitle">Extended plugboard</h3>
             </div>
-            <span id="plugboardValidity" class="wiring-validity">10 active pairs</span>
+            <span id="plugboardValidity" class="wiring-validity">25 active pairs</span>
           </div>
           <p class="plugboard-lab-copy">
-            Start with the supplied 10-pair preset or build reciprocal swaps between
+            Start with the supplied 25-pair preset or build reciprocal swaps between
             any two symbols. Each symbol can appear once; spaces bypass the plugboard.
           </p>
           <div class="plugboard-toolbar">
             <p id="plugboardError" aria-live="polite">
-              Default 10-pair preset active. Edit any pair or clear it to use an identity plugboard.
+              Default 25-pair preset active. Every modulo-50 symbol is connected once.
             </p>
             <div class="plugboard-actions">
               <button class="secondary" id="useDefaultPlugboard" type="button">Use default</button>
@@ -153,8 +153,8 @@
           <div class="wiring-intro">
             <div class="wiring-guidance">
               <p>
-                Enter every modulo-40 symbol exactly once in this order:
-                <code>ABCDEFGHIJKLMNOPQRSTUVWXYZ.,?!()[]{}:;-'</code>.
+                Enter every modulo-50 symbol exactly once in this order:
+                <code>ABCDEFGHIJKLMNOPQRSTUVWXYZ.,?!()[]{}:;-'0123456789</code>.
                 Then choose <strong>Use in this position</strong>.
               </p>
               <p class="circuit-note">
@@ -216,7 +216,7 @@
                 <button data-operation-mode="decrypt" type="button">Decrypt</button>
               </div>
               <p id="modeExplanation">
-                A–Z and 14 special characters are encrypted modulo 40; spaces pass through without stepping.
+                A–Z, 0–9, and 14 special characters are encrypted modulo 50; spaces pass through without stepping.
               </p>
             </div>
             <div class="message-column input-column">
@@ -293,7 +293,7 @@
       <ol>
         <li>The right rotor steps before every supported non-space symbol.</li>
         <li>The plugboard swaps the input before current enters the rotors.</li>
-        <li>Current travels right-to-left through all three modulo-40 rotors.</li>
+        <li>Current travels right-to-left through all three modulo-50 rotors.</li>
         <li>The reflector sends it back through the inverse wirings.</li>
         <li>The return signal passes through the plugboard again before a lamp illuminates.</li>
       </ol>

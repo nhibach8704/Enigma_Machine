@@ -1299,7 +1299,7 @@ textarea::placeholder {
 
 .letter-board {
   display: grid;
-  grid-template-columns: repeat(18, 1fr);
+  grid-template-columns: repeat(20, 1fr);
   gap: 12px 6px;
 }
 
@@ -1325,19 +1325,19 @@ textarea::placeholder {
 }
 
 .letter-row:nth-child(2) .letter:first-child {
-  grid-column-start: 2;
+  grid-column-start: 3;
 }
 
 .letter-row:nth-child(3) .letter:first-child {
-  grid-column-start: 1;
-}
-
-.letter-row:nth-child(4) .letter:first-child {
   grid-column-start: 2;
 }
 
+.letter-row:nth-child(4) .letter:first-child {
+  grid-column-start: 3;
+}
+
 .letter-row:nth-child(5) .letter:first-child {
-  grid-column-start: 4;
+  grid-column-start: 5;
 }
 
 .lampboard .letter.lit {

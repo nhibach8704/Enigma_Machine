@@ -2,7 +2,8 @@
 
 const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
 const SPECIAL_CHARACTERS = ".,?!()[]{}:;-'";
-const ALPHABET = LETTERS + SPECIAL_CHARACTERS;
+const NUMBERS = "0123456789";
+const ALPHABET = LETTERS + SPECIAL_CHARACTERS + NUMBERS;
 const MODULUS = ALPHABET.length;
 const KEYBOARD_ROWS = [
   "QWERTZUIO",
@@ -10,34 +11,50 @@ const KEYBOARD_ROWS = [
   "PYXCVBNML",
   ".,?!()[]",
   "{}:;-'",
+  "1234567890",
 ];
 const ROTORS = {
-  I: { wiring: "})HR:NPC{[!JV(D]'X-,?WKG.;OUILFYTEZBQMAS", notch: "Q" },
-  II: { wiring: "'.MWH}!);,Z:TC-U{]ERKO(?J[PGFSBLYDXVANIQ", notch: "E" },
-  III: { wiring: "]E!W?-'}[VFCIA).N{P;:,XB(TGOYUHSKMQZRDJL", notch: "V" },
-  IV: { wiring: "'U[V-}AN{KB:;J()WOX,!Z?.G]PCLHTYSREMIQFD", notch: "J" },
-  V: { wiring: ".!I[?HA}),{KOFE:XW-LC]';(UYQMVSGZBPTJDRN", notch: "Z" },
+  I: { wiring: "{'8?!01])9(-W:E2},46.;37[5PMTQGSUHXNOVRJFLDABZYCKI", notch: "Q" },
+  II: { wiring: "09[O532{(.4:!786S)?;}'-]1,HQNZDEUPWCKAIFGRXJBTMVYL", notch: "E" },
+  III: { wiring: ".KG?52(!4[8]:,6'3907{}-);1UPSJBDHRTLVWQYAFMCENXOZI", notch: "V" },
+  IV: { wiring: "?1-07(5!8'.,26;[)9T]:}Y4{3KXZWPOFLDJUBGNASVHRQCIME", notch: "J" },
+  V: { wiring: "2}{69(.]1;,:3[R'!4U5?)-087IHSCPQGODNAJXZBWELMKYVTF", notch: "Z" },
 };
 
 const CUSTOM_ROTOR_IDS = ["CUSTOM_LEFT", "CUSTOM_MIDDLE", "CUSTOM_RIGHT"];
 const POSITION_NAMES = ["Left", "Middle", "Right"];
 
 const REFLECTORS = {
-  B: "];S{)PM(.,-UG?YF[!CZL:'}OTIJNRHEQADXVBKW",
-  C: ".G(R!MB,:ZN?FK-){D[V;T']}JAHLECPSXQYIUOW",
+  B: ":,19P.{-7;(2'5)E}]0?8!436[FBTVKOZRGQAJHMSCLXWNYIUD",
+  C: "0Y;9]48:,?{73-}(1)!6'5.[B2WIJSPRXEKOHCNUAQZMFVTLGD",
 };
 
 const DEFAULT_PLUGBOARD_PAIRS = [
-  "AV",
-  "BS",
-  "CG",
-  "DL",
-  "FU",
-  "HZ",
+  "TH",
+  "?Y",
+  "VR",
+  "B9",
+  ":6",
+  ".E",
+  "Z8",
+  "2!",
+  "S-",
+  ")A",
+  "FG",
+  "0Q",
+  "PM",
+  "4,",
+  "O1",
+  "D'",
+  "5U",
+  "L(",
+  ";K",
+  "7X",
+  "J{",
+  "W]",
+  "C[",
   "IN",
-  "KM",
-  "OW",
-  "RX",
+  "3}",
 ].map((pair) => [...pair]);
 
 const DEFAULTS = {
@@ -390,7 +407,7 @@ function validateCustomRotor(index, wiring, notch) {
   if (cleanWiring.length !== MODULUS) {
     error = `Wiring needs ${MODULUS} symbols; currently ${cleanWiring.length}.`;
   } else if (new Set(cleanWiring).size !== MODULUS) {
-    error = "Each symbol in the modulo-40 alphabet must appear exactly once.";
+    error = `Each symbol in the modulo-${MODULUS} alphabet must appear exactly once.`;
   } else if (index > 0 && !cleanNotch.length) {
     error = "Enter at least one turnover notch symbol.";
   } else if (index > 0 && new Set(cleanNotch).size !== cleanNotch.length) {
@@ -424,7 +441,7 @@ function createCustomRotorEditor() {
             <input
               data-custom-wiring="${index}"
               value="${rotor.wiring}"
-              maxlength="40"
+              maxlength="${MODULUS}"
               autocomplete="off"
               spellcheck="false"
               aria-label="${POSITION_NAMES[index]} custom rotor wiring"
@@ -441,7 +458,7 @@ function createCustomRotorEditor() {
                 <input
                   data-custom-notch="${index}"
                   value="${rotor.notch}"
-                  maxlength="40"
+                  maxlength="${MODULUS}"
                   autocomplete="off"
                   spellcheck="false"
                   aria-label="${POSITION_NAMES[index]} custom rotor turnover notch"
@@ -522,7 +539,7 @@ function renderSessionStats() {
     `${symbolsProcessed} symbol${symbolsProcessed === 1 ? "" : "s"} processed · Initial ${initial} · Current ${current}`;
 
   const stats = [
-    ["Symbols processed", symbolsProcessed, "40-symbol alphabet"],
+    ["Symbols processed", symbolsProcessed, `${MODULUS}-symbol alphabet`],
     ["Right rotor · Fast", steps[2], "steps before every encrypted symbol"],
     ["Middle rotor · Turnover", steps[1], machine.turnover ? `triggered by right notch ${getRotorSpec(machine.rotorOrder[2]).notch}` : "disabled in this mode"],
     ["Left rotor · Slow", steps[0], machine.turnover ? `triggered by middle notch ${getRotorSpec(machine.rotorOrder[1]).notch}` : "disabled in this mode"],
@@ -720,7 +737,7 @@ function validatePlugboard(pairs) {
 }
 
 function plugboardOptionLabel(symbol) {
-  return LETTERS.includes(symbol)
+  return LETTERS.includes(symbol) || NUMBERS.includes(symbol)
     ? symbol
     : `${symbol} · ${symbolName(symbol)}`;
 }
@@ -786,10 +803,10 @@ function renderPlugboardValidity() {
     : "Plugboard needs attention";
   elements.plugboardError.textContent = plugboard.error ||
     (plugboardMatchesDefault()
-      ? "Default 10-pair preset active. Edit any pair or clear it to use an identity plugboard."
+      ? `Default ${DEFAULT_PLUGBOARD_PAIRS.length}-pair preset active. Every modulo-${MODULUS} symbol is connected once.`
       : plugboard.pairs.length
       ? "Each connection is a reciprocal swap applied before and after the rotors."
-      : "Add a connection to swap any two letters or special characters.");
+      : "Add a connection to swap any two letters, numbers, or special characters.");
   elements.plugboardError.classList.toggle("error", !plugboard.valid);
 }
 
@@ -885,8 +902,8 @@ function renderOperationMode() {
     ? "Decipher message"
     : "Encipher message";
   elements.modeExplanation.textContent = decrypting
-    ? "All 40 supported symbols are decrypted modulo 40; spaces pass through without stepping."
-    : "A–Z and 14 special characters are encrypted modulo 40; spaces pass through without stepping.";
+    ? `All ${MODULUS} supported symbols are decrypted modulo ${MODULUS}; spaces pass through without stepping.`
+    : `A–Z, 0–9, and ${SPECIAL_CHARACTERS.length} special characters are encrypted modulo ${MODULUS}; spaces pass through without stepping.`;
   elements.plainText.placeholder = decrypting
     ? "TYPE OR PASTE CIPHERTEXT…"
     : "TYPE A MESSAGE…";
