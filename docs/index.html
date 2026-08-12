@@ -5,20 +5,20 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta
       name="description"
-      content="An interactive, historically accurate three-rotor Enigma I simulator."
+      content="An interactive modulo-40 Enigma simulator with special characters, preserved spaces, and an extended plugboard."
     />
     <meta name="theme-color" content="#171916" />
-    <title>Enigma I — Interactive Cipher Machine</title>
-    <link rel="stylesheet" href="styles.css?v=20260803-3" />
-    <script src="app.js?v=20260803-2" defer></script>
+    <title>Enigma 40 — Interactive Cipher Machine</title>
+    <link rel="stylesheet" href="styles.css?v=20260811-3" />
+    <script src="app.js?v=20260811-4" defer></script>
   </head>
   <body>
     <header class="site-header">
-      <a class="brand" href="#" aria-label="Enigma I home">
+      <a class="brand" href="#" aria-label="Enigma 40 home">
         <span class="brand-mark">E</span>
         <span>
-          <strong>ENIGMA I</strong>
-          <small>CIPHER MACHINE / 1930</small>
+          <strong>ENIGMA 40</strong>
+          <small>EXTENDED CIPHER MACHINE</small>
         </span>
       </a>
       <div class="header-note">
@@ -31,13 +31,13 @@
     <main>
       <section class="intro" aria-labelledby="page-title">
         <div>
-          <p class="eyebrow">Interactive historical simulator</p>
-          <h1 id="page-title">Secrets move<br /><em>one letter at a time.</em></h1>
+          <p class="eyebrow">Interactive modulo-40 simulator</p>
+          <h1 id="page-title">Secrets move<br /><em>one symbol at a time.</em></h1>
         </div>
         <p class="intro-copy">
-          Configure three rotors, set their rings and starting positions, then
-          type on the machine. Because Enigma is reciprocal, the same settings
-          decipher what they encipher.
+          Configure three rotors, set their rings and starting positions,
+          connect the plugboard, then type letters or punctuation. The same
+          settings decipher what they encipher; spaces stay in place without stepping.
         </p>
       </section>
 
@@ -104,16 +104,44 @@
           <div class="active-config-grid" id="activeConfiguration" aria-live="polite"></div>
         </section>
 
+        <section class="plugboard-lab" aria-labelledby="plugboardLabTitle">
+          <div class="plugboard-lab-heading">
+            <div>
+              <p class="eyebrow">Entry &amp; return mapping</p>
+              <h3 id="plugboardLabTitle">Extended plugboard</h3>
+            </div>
+            <span id="plugboardValidity" class="wiring-validity">10 active pairs</span>
+          </div>
+          <p class="plugboard-lab-copy">
+            Start with the supplied 10-pair preset or build reciprocal swaps between
+            any two symbols. Each symbol can appear once; spaces bypass the plugboard.
+          </p>
+          <div class="plugboard-toolbar">
+            <p id="plugboardError" aria-live="polite">
+              Default 10-pair preset active. Edit any pair or clear it to use an identity plugboard.
+            </p>
+            <div class="plugboard-actions">
+              <button class="secondary" id="useDefaultPlugboard" type="button">Use default</button>
+              <button class="secondary danger" id="clearPlugboard" type="button">Clear all</button>
+              <button id="addPlugboardPair" type="button">Add connection</button>
+            </div>
+          </div>
+          <div class="plugboard-connections" id="plugboardConnections"></div>
+        </section>
+
         <section class="reflector-lab" id="reflectorPanel" aria-labelledby="reflectorLabTitle">
           <div class="reflector-lab-heading">
             <div>
               <p class="eyebrow" id="reflectorLabEyebrow">Preset reflector</p>
               <h3 id="reflectorLabTitle">Option 1 reflector pairboard</h3>
             </div>
-            <span id="reflectorValidity" class="wiring-validity">Option 1 preset</span>
+            <div class="reflector-lab-actions">
+              <span id="reflectorValidity" class="wiring-validity">Option 1 preset</span>
+              <button class="reflector-clear" id="clearReflectorPairs" type="button" hidden>Clear all</button>
+            </div>
           </div>
           <p class="reflector-lab-copy" id="reflectorLabCopy">
-            The selected historical reflector connects the alphabet into 13
+            The selected extended reflector connects the alphabet into 20
             fixed reciprocal pairs.
           </p>
           <div class="reflector-pairs" id="reflectorPairs"></div>
@@ -133,12 +161,13 @@
           <div class="wiring-intro">
             <div class="wiring-guidance">
               <p>
-                Enter every letter A–Z exactly once. The first character maps A,
-                the second maps B, and so on. Then choose <strong>Use in this position</strong>.
+                Enter every modulo-40 symbol exactly once in this order:
+                <code>ABCDEFGHIJKLMNOPQRSTUVWXYZ.,?!()[]{}:;-'</code>.
+                Then choose <strong>Use in this position</strong>.
               </p>
               <p class="circuit-note">
                 <strong>Important:</strong> wiring describes one rotor, not the final ciphertext.
-                The machine steps before each letter, then uses all rotors and the reflector.
+                The machine steps before each supported symbol, then uses all rotors and the reflector.
               </p>
             </div>
             <span id="wiringValidity" class="wiring-validity">All installed rotors valid</span>
@@ -168,7 +197,7 @@
             <div class="stepping-rule">
               <span>Historical stepping order</span>
               <strong>Right <em>fast</em> → Middle <em>turnover</em> → Left <em>slow</em></strong>
-              <small>The right rotor advances before every processed letter. The middle advances only when turnover is triggered.</small>
+              <small>The right rotor advances before every processed symbol. The middle advances only when turnover is triggered.</small>
             </div>
             <div class="rotor-windows" id="rotorWindows"></div>
             <div class="bank-legend">
@@ -183,7 +212,7 @@
                 <span class="deck-kicker">Movement report</span>
                 <h3 id="session-stats-title">Since the initial setting</h3>
               </div>
-              <p id="sessionSummary">0 letters processed · Initial AAA · Current AAA</p>
+              <p id="sessionSummary">0 symbols processed · Initial AAA · Current AAA</p>
             </div>
             <div class="movement-stats" id="movementStats" aria-live="polite"></div>
           </section>
@@ -195,13 +224,13 @@
                 <button data-operation-mode="decrypt" type="button">Decrypt</button>
               </div>
               <p id="modeExplanation">
-                Only A–Z enters the machine; every other character passes through unchanged.
+                A–Z and 14 special characters are encrypted modulo 40; spaces pass through without stepping.
               </p>
             </div>
             <div class="message-column input-column">
               <div class="message-label">
                 <label for="plainText" id="inputLabel">Plaintext</label>
-                <span id="inputCount">0 letters</span>
+                <span id="inputCount">0 symbols</span>
               </div>
               <textarea
                 id="plainText"
@@ -232,7 +261,7 @@
           <div class="lampboard">
             <div class="deck-title">
               <span>Lampboard</span>
-              <small>Click a key or use your keyboard</small>
+              <small>Click a symbol or use your keyboard</small>
             </div>
             <div class="letter-board" id="lampboard" aria-label="Enigma lampboard"></div>
           </div>
@@ -240,7 +269,7 @@
           <div class="keyboard">
             <div class="deck-title">
               <span>Keyboard</span>
-              <small>Press any letter</small>
+              <small>Press any supported symbol</small>
             </div>
             <div class="letter-board keyboard-board" id="keyboard" aria-label="Enigma keyboard"></div>
           </div>
@@ -253,24 +282,24 @@
             <p class="eyebrow">03 / Signal path</p>
             <h2 id="trace-title">Inside the last keypress</h2>
           </div>
-          <p class="trace-summary" id="traceSummary">Press a key to follow the current.</p>
+          <p class="trace-summary" id="traceSummary">Press a supported symbol to follow the current.</p>
         </div>
         <div class="trace-card" id="traceCard">
           <div class="empty-trace">
             <span class="empty-trace-icon">↯</span>
-            <p>The machine steps before the first letter; its full electrical journey will appear here.</p>
+            <p>The machine steps before the first encrypted symbol; its full electrical journey will appear here.</p>
           </div>
         </div>
       </section>
 
       <section class="facts" aria-label="Enigma facts">
         <article>
-          <span class="fact-number">158,962,555,217,826,360,000</span>
-          <p>possible settings on a military Enigma with plugboard.</p>
+          <span class="fact-number">40 contacts</span>
+          <p>26 letters and 14 punctuation symbols participate directly in the cipher.</p>
         </article>
         <article>
-          <span class="fact-number">No letter</span>
-          <p>can ever encipher to itself—a useful clue for cryptanalysts.</p>
+          <span class="fact-number">No symbol</span>
+          <p>can encipher to itself while the reflector remains fixed-point-free.</p>
         </article>
         <article>
           <span class="fact-number">Reciprocal</span>
@@ -282,12 +311,13 @@
     <dialog id="aboutDialog">
       <button class="dialog-close" id="closeAbout" type="button" aria-label="Close">×</button>
       <p class="eyebrow">A short primer</p>
-      <h2>How Enigma transforms a letter</h2>
+      <h2>How Enigma transforms a symbol</h2>
       <ol>
-        <li>The right rotor steps before every keypress.</li>
-        <li>Current travels right-to-left through all three rotors.</li>
+        <li>The right rotor steps before every supported non-space symbol.</li>
+        <li>The plugboard swaps the input before current enters the rotors.</li>
+        <li>Current travels right-to-left through all three modulo-40 rotors.</li>
         <li>The reflector sends it back through the inverse wirings.</li>
-        <li>A different lamp illuminates, and the circuit opens on release.</li>
+        <li>The return signal passes through the plugboard again before a lamp illuminates.</li>
       </ol>
       <p>
         When a rotor reaches its notch, it turns its neighbor. The middle rotor
@@ -296,8 +326,8 @@
     </dialog>
 
     <footer>
-      <span>ENIGMA I / EDUCATIONAL SIMULATOR</span>
-      <span>Custom rotors &amp; reflector · No plugboard</span>
+      <span>ENIGMA 40 / EDUCATIONAL SIMULATOR</span>
+      <span>Custom rotors, reflector &amp; extended plugboard</span>
     </footer>
   </body>
 </html>

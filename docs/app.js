@@ -1,23 +1,47 @@
 "use strict";
 
-const ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
-const KEYBOARD_ROWS = ["QWERTZUIO", "ASDFGHJK", "PYXCVBNML"];
+const LETTERS = "ABCDEFGHIJKLMNOPQRSTUVWXYZ";
+const SPECIAL_CHARACTERS = ".,?!()[]{}:;-'";
+const ALPHABET = LETTERS + SPECIAL_CHARACTERS;
+const MODULUS = ALPHABET.length;
+const KEYBOARD_ROWS = [
+  "QWERTZUIO",
+  "ASDFGHJK",
+  "PYXCVBNML",
+  ".,?!()[]",
+  "{}:;-'",
+];
+const EXTENDED_ROTOR_SUFFIX = SPECIAL_CHARACTERS;
+const EXTENDED_REFLECTOR_SUFFIX = ",.!?)(][}{;:'-";
 
 const ROTORS = {
-  I: { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ", notch: "Q" },
-  II: { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE", notch: "E" },
-  III: { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO", notch: "V" },
-  IV: { wiring: "ESOVPZJAYQUIRHXLNFTGKDCMWB", notch: "J" },
-  V: { wiring: "VZBRGITYUPSDNHLXAWMJQOFECK", notch: "Z" },
+  I: { wiring: "EKMFLGDQVZNTOWYHXUSPAIBRCJ" + EXTENDED_ROTOR_SUFFIX, notch: "Q" },
+  II: { wiring: "AJDKSIRUXBLHWTMCQGZNPYFVOE" + EXTENDED_ROTOR_SUFFIX, notch: "E" },
+  III: { wiring: "BDFHJLCPRTXVZNYEIWGAKMUSQO" + EXTENDED_ROTOR_SUFFIX, notch: "V" },
+  IV: { wiring: "ESOVPZJAYQUIRHXLNFTGKDCMWB" + EXTENDED_ROTOR_SUFFIX, notch: "J" },
+  V: { wiring: "VZBRGITYUPSDNHLXAWMJQOFECK" + EXTENDED_ROTOR_SUFFIX, notch: "Z" },
 };
 
 const CUSTOM_ROTOR_IDS = ["CUSTOM_LEFT", "CUSTOM_MIDDLE", "CUSTOM_RIGHT"];
 const POSITION_NAMES = ["Left", "Middle", "Right"];
 
 const REFLECTORS = {
-  B: "YRUHQSLDPXNGOKMIEBFZCWVJAT",
-  C: "FVPJIAOYEDRZXWGCTKUQSBNMHL",
+  B: "YRUHQSLDPXNGOKMIEBFZCWVJAT" + EXTENDED_REFLECTOR_SUFFIX,
+  C: "FVPJIAOYEDRZXWGCTKUQSBNMHL" + EXTENDED_REFLECTOR_SUFFIX,
 };
+
+const DEFAULT_PLUGBOARD_PAIRS = [
+  "AV",
+  "BS",
+  "CG",
+  "DL",
+  "FU",
+  "HZ",
+  "IN",
+  "KM",
+  "OW",
+  "RX",
+].map((pair) => [...pair]);
 
 const DEFAULTS = {
   rotorOrder: ["I", "II", "III"],
@@ -37,6 +61,13 @@ const DEFAULTS = {
     error: "",
     invalidIndexes: [],
   },
+  plugboard: {
+    pairs: DEFAULT_PLUGBOARD_PAIRS.map((pair) => [...pair]),
+    wiring: plugboardWiringFromPairs(DEFAULT_PLUGBOARD_PAIRS),
+    valid: true,
+    error: "",
+    invalidIndexes: [],
+  },
 };
 
 const machine = {
@@ -52,6 +83,11 @@ const machine = {
     pairs: [...DEFAULTS.customReflector.pairs],
     invalidIndexes: [],
   },
+  plugboard: {
+    ...DEFAULTS.plugboard,
+    pairs: DEFAULTS.plugboard.pairs.map((pair) => [...pair]),
+    invalidIndexes: [],
+  },
   history: "",
   lastTrace: null,
   stats: createEmptyStats(),
@@ -61,32 +97,75 @@ const elements = {};
 let lampTimer = null;
 let operationMode = "encrypt";
 
-function toIndex(letter) {
-  return ALPHABET.indexOf(letter);
+function toIndex(symbol) {
+  return ALPHABET.indexOf(symbol);
 }
 
-function toLetter(index) {
-  return ALPHABET[(index + 26) % 26];
+function toSymbol(index) {
+  return ALPHABET[(index + MODULUS) % MODULUS];
+}
+
+function normalizeSymbol(character) {
+  const normalized = character.toUpperCase();
+  return normalized.length === 1 && ALPHABET.includes(normalized)
+    ? normalized
+    : "";
+}
+
+function cleanAlphabetSymbols(value) {
+  return [...value]
+    .map(normalizeSymbol)
+    .filter(Boolean)
+    .join("");
+}
+
+function symbolName(symbol) {
+  const names = {
+    ".": "period",
+    ",": "comma",
+    "?": "question mark",
+    "!": "exclamation mark",
+    "(": "left parenthesis",
+    ")": "right parenthesis",
+    "[": "left bracket",
+    "]": "right bracket",
+    "{": "left brace",
+    "}": "right brace",
+    ":": "colon",
+    ";": "semicolon",
+    "-": "hyphen",
+    "'": "apostrophe",
+  };
+  return names[symbol] || symbol;
 }
 
 function createEmptyStats() {
   return {
-    lettersProcessed: 0,
+    symbolsProcessed: 0,
     steps: [0, 0, 0],
   };
 }
 
 function pairsFromWiring(wiring) {
   return [...ALPHABET]
-    .map((letter, index) => [letter, wiring[index]])
-    .filter(([source, target]) => source < target)
+    .map((symbol, index) => [symbol, wiring[index]])
+    .filter(([source, target]) => toIndex(source) < toIndex(target))
     .map((pair) => pair.join(""));
 }
 
 function wiringFromPairs(pairs) {
-  const wiring = Array(26).fill("");
+  const wiring = Array(MODULUS).fill("");
   pairs.forEach((pair) => {
     const [first, second] = pair;
+    wiring[toIndex(first)] = second;
+    wiring[toIndex(second)] = first;
+  });
+  return wiring.join("");
+}
+
+function plugboardWiringFromPairs(pairs) {
+  const wiring = [...ALPHABET];
+  pairs.forEach(([first, second]) => {
     wiring[toIndex(first)] = second;
     wiring[toIndex(second)] = first;
   });
@@ -130,54 +209,54 @@ function machineIsValid() {
   );
   const reflectorValid =
     machine.reflector !== "CUSTOM" || machine.customReflector.valid;
-  return rotorsValid && reflectorValid;
+  return rotorsValid && reflectorValid && machine.plugboard.valid;
 }
 
 function rotorTransform(rotorName, signal, position, ring, reverse = false) {
   const wiring = getRotorSpec(rotorName).wiring;
-  const internalInput = (signal + position - ring + 26) % 26;
+  const internalInput = (signal + position - ring + MODULUS) % MODULUS;
   const internalOutput = reverse
-    ? wiring.indexOf(toLetter(internalInput))
+    ? wiring.indexOf(toSymbol(internalInput))
     : toIndex(wiring[internalInput]);
-  const externalOutput = (internalOutput - position + ring + 26) % 26;
+  const externalOutput = (internalOutput - position + ring + MODULUS) % MODULUS;
 
   return {
     rotorName: rotorDisplayName(rotorName),
     direction: reverse ? "reverse" : "forward",
-    position: toLetter(position),
-    ring: toLetter(ring),
-    externalInput: toLetter(signal),
-    internalInput: toLetter(internalInput),
-    internalOutput: toLetter(internalOutput),
-    externalOutput: toLetter(externalOutput),
+    position: toSymbol(position),
+    ring: toSymbol(ring),
+    externalInput: toSymbol(signal),
+    internalInput: toSymbol(internalInput),
+    internalOutput: toSymbol(internalOutput),
+    externalOutput: toSymbol(externalOutput),
     output: externalOutput,
   };
 }
 
 function stepRotors() {
-  const before = machine.positions.map(toLetter).join("");
+  const before = machine.positions.map(toSymbol).join("");
   const rightName = machine.rotorOrder[2];
   const middleName = machine.rotorOrder[1];
-  const rightAtNotch = getRotorSpec(rightName).notch.includes(toLetter(machine.positions[2]));
-  const middleAtNotch = getRotorSpec(middleName).notch.includes(toLetter(machine.positions[1]));
+  const rightAtNotch = getRotorSpec(rightName).notch.includes(toSymbol(machine.positions[2]));
+  const middleAtNotch = getRotorSpec(middleName).notch.includes(toSymbol(machine.positions[1]));
   let leftStepped = false;
   let middleStepped = false;
 
   if (machine.turnover) {
     if (middleAtNotch) {
-      machine.positions[0] = (machine.positions[0] + 1) % 26;
+      machine.positions[0] = (machine.positions[0] + 1) % MODULUS;
       leftStepped = true;
     }
     if (rightAtNotch || middleAtNotch) {
-      machine.positions[1] = (machine.positions[1] + 1) % 26;
+      machine.positions[1] = (machine.positions[1] + 1) % MODULUS;
       middleStepped = true;
     }
   }
-  machine.positions[2] = (machine.positions[2] + 1) % 26;
+  machine.positions[2] = (machine.positions[2] + 1) % MODULUS;
 
   return {
     before,
-    after: machine.positions.map(toLetter).join(""),
+    after: machine.positions.map(toSymbol).join(""),
     rightAtNotch,
     middleAtNotch,
     leftStepped,
@@ -186,18 +265,21 @@ function stepRotors() {
   };
 }
 
-function pressKey(letter, animate = true) {
-  const normalized = letter.toUpperCase();
-  if (!ALPHABET.includes(normalized) || !machineIsValid()) return "";
+function pressKey(symbol, animate = true) {
+  const normalized = normalizeSymbol(symbol);
+  if (!normalized || !machineIsValid()) return "";
 
   const step = stepRotors();
-  machine.stats.lettersProcessed += 1;
+  machine.stats.symbolsProcessed += 1;
   if (step.leftStepped) machine.stats.steps[0] += 1;
   if (step.middleStepped) machine.stats.steps[1] += 1;
   if (step.rightStepped) machine.stats.steps[2] += 1;
   let signal = toIndex(normalized);
   const forward = [];
   const reverse = [];
+  const plugboardEntryInput = toSymbol(signal);
+  signal = toIndex(machine.plugboard.wiring[signal]);
+  const plugboardEntryOutput = toSymbol(signal);
 
   for (const rotorIndex of [2, 1, 0]) {
     const trace = rotorTransform(
@@ -210,9 +292,9 @@ function pressKey(letter, animate = true) {
     signal = trace.output;
   }
 
-  const reflectorInput = toLetter(signal);
+  const reflectorInput = toSymbol(signal);
   signal = toIndex(getReflectorWiring()[signal]);
-  const reflectorOutput = toLetter(signal);
+  const reflectorOutput = toSymbol(signal);
 
   for (const rotorIndex of [0, 1, 2]) {
     const trace = rotorTransform(
@@ -226,16 +308,23 @@ function pressKey(letter, animate = true) {
     signal = trace.output;
   }
 
-  const output = toLetter(signal);
+  const plugboardExitInput = toSymbol(signal);
+  signal = toIndex(machine.plugboard.wiring[signal]);
+  const plugboardExitOutput = toSymbol(signal);
+  const output = plugboardExitOutput;
   machine.history += output;
   machine.lastTrace = {
     input: normalized,
     output,
     step,
+    plugboardEntryInput,
+    plugboardEntryOutput,
     forward,
     reflectorInput,
     reflectorOutput,
     reverse,
+    plugboardExitInput,
+    plugboardExitOutput,
   };
 
   renderMachine();
@@ -266,8 +355,8 @@ function rotorMovementDescription(index, name) {
     return `Turnover rotor · follows the right notch · double-step notch ${spec.notch}`;
   }
   return machine.turnover
-    ? `Fast rotor · steps before every letter · turnover notch ${spec.notch}`
-    : "Fast rotor · steps before every letter · turnover disabled";
+    ? `Fast rotor · steps before every symbol · turnover notch ${spec.notch}`
+    : "Fast rotor · steps before every symbol · turnover disabled";
 }
 
 function createRotorWindows() {
@@ -281,11 +370,11 @@ function createRotorWindows() {
           </div>
           <div class="window-control">
             <button type="button" data-position-delta="-1" data-rotor-index="${index}" aria-label="Move ${["left", "middle", "right"][index]} rotor backward">−</button>
-            <div class="window-letter" id="position-${index}">${toLetter(machine.positions[index])}</div>
+            <div class="window-letter" id="position-${index}">${toSymbol(machine.positions[index])}</div>
             <button type="button" data-position-delta="1" data-rotor-index="${index}" aria-label="Move ${["left", "middle", "right"][index]} rotor forward">+</button>
           </div>
           <select class="ring-select" data-ring-index="${index}" aria-label="${["Left", "Middle", "Right"][index]} ring setting">
-            ${[...ALPHABET].map((letter, setting) => `<option value="${setting}"${machine.rings[index] === setting ? " selected" : ""}>Ring ${letter}</option>`).join("")}
+            ${[...ALPHABET].map((symbol, setting) => `<option value="${setting}"${machine.rings[index] === setting ? " selected" : ""}>Ring ${symbol}</option>`).join("")}
           </select>
           <p class="rotor-movement">${rotorMovementDescription(index, name)}</p>
         </div>
@@ -295,20 +384,20 @@ function createRotorWindows() {
 }
 
 function validateCustomRotor(index, wiring, notch) {
-  const cleanWiring = wiring.toUpperCase().replace(/[^A-Z]/g, "");
+  const cleanWiring = cleanAlphabetSymbols(wiring);
   const cleanNotch = index === 0
     ? ""
-    : notch.toUpperCase().replace(/[^A-Z]/g, "");
+    : cleanAlphabetSymbols(notch);
   let error = "";
 
-  if (cleanWiring.length !== 26) {
-    error = `Wiring needs 26 letters; currently ${cleanWiring.length}.`;
-  } else if (new Set(cleanWiring).size !== 26) {
-    error = "Each letter A–Z must appear exactly once.";
+  if (cleanWiring.length !== MODULUS) {
+    error = `Wiring needs ${MODULUS} symbols; currently ${cleanWiring.length}.`;
+  } else if (new Set(cleanWiring).size !== MODULUS) {
+    error = "Each symbol in the modulo-40 alphabet must appear exactly once.";
   } else if (index > 0 && !cleanNotch.length) {
-    error = "Enter at least one turnover notch letter.";
+    error = "Enter at least one turnover notch symbol.";
   } else if (index > 0 && new Set(cleanNotch).size !== cleanNotch.length) {
-    error = "Notch letters cannot repeat.";
+    error = "Notch symbols cannot repeat.";
   }
 
   machine.customRotors[index] = {
@@ -338,7 +427,7 @@ function createCustomRotorEditor() {
             <input
               data-custom-wiring="${index}"
               value="${rotor.wiring}"
-              maxlength="26"
+              maxlength="40"
               autocomplete="off"
               spellcheck="false"
               aria-label="${POSITION_NAMES[index]} custom rotor wiring"
@@ -355,7 +444,7 @@ function createCustomRotorEditor() {
                 <input
                   data-custom-notch="${index}"
                   value="${rotor.notch}"
-                  maxlength="26"
+                  maxlength="40"
                   autocomplete="off"
                   spellcheck="false"
                   aria-label="${POSITION_NAMES[index]} custom rotor turnover notch"
@@ -406,34 +495,38 @@ function renderActiveConfiguration() {
       <article class="active-config-card">
         <span>${POSITION_NAMES[index]} rotor</span>
         <strong>${isCustom ? "Custom wiring" : `Rotor ${name}`}</strong>
-        <small>Ring ${toLetter(machine.rings[index])} · Start ${toLetter(machine.initialPositions[index])} · Notch ${notch}</small>
-        <code title="${spec.wiring}">${spec.wiring}</code>
+        <small>Ring ${toSymbol(machine.rings[index])} · Start ${toSymbol(machine.initialPositions[index])} · Notch ${notch}</small>
       </article>
     `;
   });
 
-  const reflectorWiring = getReflectorWiring();
   rotorCards.push(`
     <article class="active-config-card">
       <span>Reflector &amp; stepping</span>
       <strong>${reflectorDisplayName()}</strong>
       <small>${machine.turnover ? "Historical turnover · Double-step enabled" : "Right rotor only · Turnover disabled"}</small>
-      <code title="${reflectorWiring}">${reflectorWiring}</code>
+    </article>
+  `);
+  rotorCards.push(`
+    <article class="active-config-card">
+      <span>Plugboard</span>
+      <strong>${machine.plugboard.pairs.length || "No"} connection${machine.plugboard.pairs.length === 1 ? "" : "s"}</strong>
+      <small>${machine.plugboard.pairs.length ? machine.plugboard.pairs.map((pair) => pair.join("↔")).join(" · ") : "Identity mapping · No swaps"}</small>
     </article>
   `);
   elements.activeConfiguration.innerHTML = rotorCards.join("");
 }
 
 function renderSessionStats() {
-  const { lettersProcessed, steps } = machine.stats;
-  const initial = machine.initialPositions.map(toLetter).join("");
-  const current = machine.positions.map(toLetter).join("");
+  const { symbolsProcessed, steps } = machine.stats;
+  const initial = machine.initialPositions.map(toSymbol).join("");
+  const current = machine.positions.map(toSymbol).join("");
   elements.sessionSummary.textContent =
-    `${lettersProcessed} letter${lettersProcessed === 1 ? "" : "s"} processed · Initial ${initial} · Current ${current}`;
+    `${symbolsProcessed} symbol${symbolsProcessed === 1 ? "" : "s"} processed · Initial ${initial} · Current ${current}`;
 
   const stats = [
-    ["Letters processed", lettersProcessed, "A–Z characters only"],
-    ["Right rotor · Fast", steps[2], "steps before every letter"],
+    ["Symbols processed", symbolsProcessed, "40-symbol alphabet"],
+    ["Right rotor · Fast", steps[2], "steps before every encrypted symbol"],
     ["Middle rotor · Turnover", steps[1], machine.turnover ? `triggered by right notch ${getRotorSpec(machine.rotorOrder[2]).notch}` : "disabled in this mode"],
     ["Left rotor · Slow", steps[0], machine.turnover ? `triggered by middle notch ${getRotorSpec(machine.rotorOrder[1]).notch}` : "disabled in this mode"],
   ];
@@ -451,11 +544,9 @@ function renderSessionStats() {
 }
 
 function validateCustomReflector(pairs) {
-  const cleanPairs = pairs.map((pair) =>
-    pair.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2),
-  );
+  const cleanPairs = pairs.map((pair) => cleanAlphabetSymbols(pair).slice(0, 2));
   const invalidIndexes = new Set();
-  const letterOwners = new Map();
+  const symbolOwners = new Map();
   let hasIncompletePair = false;
   let hasSelfPair = false;
 
@@ -468,15 +559,15 @@ function validateCustomReflector(pairs) {
       hasSelfPair = true;
       invalidIndexes.add(index);
     }
-    [...pair].forEach((letter) => {
-      const owners = letterOwners.get(letter) || [];
+    [...pair].forEach((symbol) => {
+      const owners = symbolOwners.get(symbol) || [];
       owners.push(index);
-      letterOwners.set(letter, owners);
+      symbolOwners.set(symbol, owners);
     });
   });
 
   let hasDuplicates = false;
-  letterOwners.forEach((owners) => {
+  symbolOwners.forEach((owners) => {
     if (owners.length > 1) {
       hasDuplicates = true;
       owners.forEach((index) => invalidIndexes.add(index));
@@ -485,11 +576,11 @@ function validateCustomReflector(pairs) {
 
   let error = "";
   if (hasIncompletePair) {
-    error = "Each reflector pair needs exactly two letters.";
+    error = "Each reflector pair needs exactly two symbols.";
   } else if (hasSelfPair) {
-    error = "A reflector cannot connect a letter to itself.";
-  } else if (hasDuplicates || letterOwners.size !== 26) {
-    error = "Use every letter A–Z exactly once across the 13 pairs.";
+    error = "A reflector cannot connect a symbol to itself.";
+  } else if (hasDuplicates || symbolOwners.size !== MODULUS) {
+    error = `Use every modulo-${MODULUS} symbol exactly once across the ${MODULUS / 2} pairs.`;
   }
 
   const valid = !error;
@@ -533,6 +624,7 @@ function createReflectorEditor() {
 
 function renderReflectorValidity() {
   const isCustom = machine.reflector === "CUSTOM";
+  elements.clearReflectorPairs.hidden = !isCustom;
   elements.reflectorLabEyebrow.textContent = isCustom
     ? "Custom component"
     : "Preset reflector";
@@ -540,8 +632,8 @@ function renderReflectorValidity() {
     ? "Custom reflector pairboard"
     : `${reflectorDisplayName()} reflector pairboard`;
   elements.reflectorLabCopy.textContent = isCustom
-    ? "Connect the alphabet into 13 pairs. Each letter must appear exactly once, and a letter cannot connect to itself."
-    : `${reflectorDisplayName()} connects the alphabet into 13 fixed reciprocal pairs. Select Custom to create your own.`;
+    ? `Connect the alphabet into ${MODULUS / 2} pairs. Each symbol must appear exactly once, and a symbol cannot connect to itself.`
+    : `${reflectorDisplayName()} connects the alphabet into ${MODULUS / 2} fixed reciprocal pairs. Select Custom to create your own.`;
 
   if (!isCustom) {
     elements.reflectorValidity.classList.remove("invalid");
@@ -557,8 +649,185 @@ function renderReflectorValidity() {
     ? "Valid reciprocal reflector"
     : "Custom reflector incomplete";
   elements.reflectorError.textContent =
-    reflector.error || "All 26 contacts are paired.";
+    reflector.error || `All ${MODULUS} contacts are paired.`;
   elements.reflectorError.classList.toggle("error", !reflector.valid);
+}
+
+function clearCustomReflectorPairs() {
+  if (machine.reflector !== "CUSTOM") return;
+  validateCustomReflector(Array(MODULUS / 2).fill(""));
+  machine.history = "";
+  machine.lastTrace = null;
+  machine.stats = createEmptyStats();
+  machine.positions = [...machine.initialPositions];
+  createReflectorEditor();
+  renderMachine();
+  renderTrace();
+}
+
+function validatePlugboard(pairs) {
+  const cleanPairs = pairs.map((pair) => [
+    normalizeSymbol(pair[0] || ""),
+    normalizeSymbol(pair[1] || ""),
+  ]);
+  const invalidIndexes = new Set();
+  const symbolOwners = new Map();
+  let hasIncompletePair = false;
+  let hasSelfPair = false;
+
+  cleanPairs.forEach((pair, index) => {
+    const [first, second] = pair;
+    if (!first || !second) {
+      hasIncompletePair = true;
+      invalidIndexes.add(index);
+    }
+    if (first && first === second) {
+      hasSelfPair = true;
+      invalidIndexes.add(index);
+    }
+    pair.filter(Boolean).forEach((symbol) => {
+      const owners = symbolOwners.get(symbol) || [];
+      owners.push(index);
+      symbolOwners.set(symbol, owners);
+    });
+  });
+
+  let hasDuplicates = false;
+  symbolOwners.forEach((owners) => {
+    if (owners.length > 1) {
+      hasDuplicates = true;
+      owners.forEach((index) => invalidIndexes.add(index));
+    }
+  });
+
+  let error = "";
+  if (cleanPairs.length > MODULUS / 2) {
+    error = `The plugboard supports at most ${MODULUS / 2} disjoint pairs.`;
+  } else if (hasIncompletePair) {
+    error = "Choose two symbols for every plugboard connection.";
+  } else if (hasSelfPair) {
+    error = "A plugboard connection cannot join a symbol to itself.";
+  } else if (hasDuplicates) {
+    error = "A symbol can appear in only one plugboard connection.";
+  }
+
+  const valid = !error;
+  machine.plugboard = {
+    pairs: cleanPairs,
+    wiring: valid ? plugboardWiringFromPairs(cleanPairs) : ALPHABET,
+    valid,
+    error,
+    invalidIndexes: [...invalidIndexes],
+  };
+  return machine.plugboard;
+}
+
+function plugboardOptionLabel(symbol) {
+  return LETTERS.includes(symbol)
+    ? symbol
+    : `${symbol} · ${symbolName(symbol)}`;
+}
+
+function plugboardOptions(selected, pairIndex) {
+  const usedElsewhere = new Set(
+    machine.plugboard.pairs
+      .filter((_, index) => index !== pairIndex)
+      .flat(),
+  );
+  return [
+    '<option value="">Choose symbol</option>',
+    ...[...ALPHABET].map((symbol) =>
+      `<option value="${symbol}"${selected === symbol ? " selected" : ""}${usedElsewhere.has(symbol) ? " disabled" : ""}>${plugboardOptionLabel(symbol)}</option>`,
+    ),
+  ].join("");
+}
+
+function createPlugboardEditor() {
+  if (!machine.plugboard.pairs.length) {
+    elements.plugboardConnections.innerHTML = `
+      <p class="plugboard-empty">No connections. Every symbol currently passes through the plugboard unchanged.</p>
+    `;
+  } else {
+    elements.plugboardConnections.innerHTML = machine.plugboard.pairs
+      .map(
+        (pair, index) => `
+          <div class="plugboard-connection${machine.plugboard.invalidIndexes.includes(index) ? " invalid" : ""}">
+            <span>Pair ${String(index + 1).padStart(2, "0")}</span>
+            <select data-plugboard-pair="${index}" data-plugboard-side="0" aria-label="Plugboard pair ${index + 1} first symbol">
+              ${plugboardOptions(pair[0], index)}
+            </select>
+            <span class="plugboard-link" aria-hidden="true">↔</span>
+            <select data-plugboard-pair="${index}" data-plugboard-side="1" aria-label="Plugboard pair ${index + 1} second symbol">
+              ${plugboardOptions(pair[1], index)}
+            </select>
+            <button type="button" data-remove-plugboard="${index}" aria-label="Remove plugboard pair ${index + 1}">Remove</button>
+          </div>
+        `,
+      )
+      .join("");
+  }
+  elements.addPlugboardPair.disabled =
+    !machine.plugboard.valid || machine.plugboard.pairs.length >= MODULUS / 2;
+  elements.clearPlugboard.disabled = machine.plugboard.pairs.length === 0;
+  renderPlugboardValidity();
+}
+
+function plugboardMatchesDefault() {
+  return machine.plugboard.valid &&
+    machine.plugboard.pairs.length === DEFAULT_PLUGBOARD_PAIRS.length &&
+    machine.plugboard.pairs.every((pair, index) =>
+      pair[0] === DEFAULT_PLUGBOARD_PAIRS[index][0] &&
+      pair[1] === DEFAULT_PLUGBOARD_PAIRS[index][1],
+    );
+}
+
+function renderPlugboardValidity() {
+  const plugboard = machine.plugboard;
+  elements.plugboardValidity.classList.toggle("invalid", !plugboard.valid);
+  elements.plugboardValidity.textContent = plugboard.valid
+    ? `${plugboard.pairs.length} active pair${plugboard.pairs.length === 1 ? "" : "s"}`
+    : "Plugboard needs attention";
+  elements.plugboardError.textContent = plugboard.error ||
+    (plugboardMatchesDefault()
+      ? "Default 10-pair preset active. Edit any pair or clear it to use an identity plugboard."
+      : plugboard.pairs.length
+      ? "Each connection is a reciprocal swap applied before and after the rotors."
+      : "Add a connection to swap any two letters or special characters.");
+  elements.plugboardError.classList.toggle("error", !plugboard.valid);
+}
+
+function addPlugboardPair() {
+  const used = new Set(machine.plugboard.pairs.flat());
+  const available = [...ALPHABET].filter((symbol) => !used.has(symbol));
+  if (available.length < 2) return;
+  validatePlugboard([...machine.plugboard.pairs, [available[0], available[1]]]);
+  rebuildFromConfiguration();
+}
+
+function useDefaultPlugboard() {
+  validatePlugboard(
+    DEFAULT_PLUGBOARD_PAIRS.map((pair) => [...pair]),
+  );
+  rebuildFromConfiguration();
+}
+
+function clearPlugboard() {
+  validatePlugboard([]);
+  rebuildFromConfiguration();
+}
+
+function updatePlugboardPair(pairIndex, side, symbol) {
+  const pairs = machine.plugboard.pairs.map((pair) => [...pair]);
+  pairs[pairIndex][side] = symbol;
+  validatePlugboard(pairs);
+  rebuildFromConfiguration();
+}
+
+function removePlugboardPair(pairIndex) {
+  validatePlugboard(
+    machine.plugboard.pairs.filter((_, index) => index !== pairIndex),
+  );
+  rebuildFromConfiguration();
 }
 
 function createLetterBoard(container, isKeyboard) {
@@ -566,10 +835,10 @@ function createLetterBoard(container, isKeyboard) {
     (row) => `
       <div class="letter-row">
         ${[...row]
-          .map((letter) =>
+          .map((symbol) =>
             isKeyboard
-              ? `<button class="letter" type="button" data-key="${letter}" aria-label="Press ${letter}">${letter}</button>`
-              : `<span class="letter" data-lamp="${letter}" aria-label="${letter} lamp">${letter}</span>`,
+              ? `<button class="letter" type="button" data-key="${symbol}" aria-label="Press ${symbolName(symbol)}">${symbol}</button>`
+              : `<span class="letter" data-lamp="${symbol}" aria-label="${symbolName(symbol)} lamp">${symbol}</span>`,
           )
           .join("")}
       </div>
@@ -594,7 +863,7 @@ function updateRotorSelects() {
 function renderMachine() {
   machine.positions.forEach((position, index) => {
     const window = document.getElementById(`position-${index}`);
-    if (window) window.textContent = toLetter(position);
+    if (window) window.textContent = toSymbol(position);
   });
   elements.cipherText.value = machine.history;
   elements.turnoverToggle.checked = machine.turnover;
@@ -619,8 +888,8 @@ function renderOperationMode() {
     ? "Decipher message"
     : "Encipher message";
   elements.modeExplanation.textContent = decrypting
-    ? "Only A–Z is decrypted; every other character passes through unchanged."
-    : "Only A–Z enters the machine; every other character passes through unchanged.";
+    ? "All 40 supported symbols are decrypted modulo 40; spaces pass through without stepping."
+    : "A–Z and 14 special characters are encrypted modulo 40; spaces pass through without stepping.";
   elements.plainText.placeholder = decrypting
     ? "TYPE OR PASTE CIPHERTEXT…"
     : "TYPE A MESSAGE…";
@@ -632,11 +901,11 @@ function renderOperationMode() {
 function renderTrace() {
   const trace = machine.lastTrace;
   if (!trace) {
-    elements.traceSummary.textContent = "Press a key to follow the current.";
+    elements.traceSummary.textContent = "Press a supported symbol to follow the current.";
     elements.traceCard.innerHTML = `
       <div class="empty-trace">
         <span class="empty-trace-icon">↯</span>
-        <p>The machine steps before the first letter; its full electrical journey will appear here.</p>
+        <p>The machine steps before the first encrypted symbol; its full electrical journey will appear here.</p>
       </div>
     `;
     return;
@@ -647,6 +916,12 @@ function renderTrace() {
 
   const nodes = [
     { letter: trace.input, label: "Key", detail: "Input", className: "endpoint" },
+    {
+      letter: trace.plugboardEntryOutput,
+      label: "Plugboard",
+      detail: `${trace.plugboardEntryInput} ↔ ${trace.plugboardEntryOutput}`,
+      className: "plugboard",
+    },
     ...trace.forward.map((item) => ({
       letter: item.externalOutput,
       label: `Rotor ${item.rotorName}`,
@@ -665,6 +940,12 @@ function renderTrace() {
       detail: `← ${item.internalInput}:${item.internalOutput}`,
       className: "",
     })),
+    {
+      letter: trace.plugboardExitOutput,
+      label: "Plugboard",
+      detail: `${trace.plugboardExitInput} ↔ ${trace.plugboardExitOutput}`,
+      className: "plugboard",
+    },
     { letter: trace.output, label: "Lamp", detail: "Output", className: "endpoint" },
   ];
 
@@ -734,6 +1015,7 @@ function rebuildFromConfiguration() {
   createRotorWindows();
   createCustomRotorEditor();
   createReflectorEditor();
+  createPlugboardEditor();
   updateRotorSelects();
   renderMachine();
   renderTrace();
@@ -754,6 +1036,11 @@ function restoreDefaults() {
       pairs: [...DEFAULTS.customReflector.pairs],
       invalidIndexes: [],
     },
+    plugboard: {
+      ...DEFAULTS.plugboard,
+      pairs: DEFAULTS.plugboard.pairs.map((pair) => [...pair]),
+      invalidIndexes: [],
+    },
     history: "",
     lastTrace: null,
     stats: createEmptyStats(),
@@ -761,24 +1048,22 @@ function restoreDefaults() {
   createRotorWindows();
   createCustomRotorEditor();
   createReflectorEditor();
+  createPlugboardEditor();
   updateRotorSelects();
   renderMachine();
   renderOperationMode();
   renderTrace();
 }
 
-function cleanLetters(value) {
-  return [...value]
-    .map((character) => character.toUpperCase())
-    .filter((character) => character.length === 1 && ALPHABET.includes(character))
-    .join("");
+function cleanMessageSymbols(value) {
+  return cleanAlphabetSymbols(value);
 }
 
 function transformMessage(value) {
   let result = "";
   for (const character of value) {
-    const normalized = character.toUpperCase();
-    result += normalized.length === 1 && ALPHABET.includes(normalized)
+    const normalized = normalizeSymbol(character);
+    result += normalized
       ? pressKey(normalized, false)
       : character;
   }
@@ -821,7 +1106,7 @@ function bindEvents() {
     if (!button) return;
     const index = Number(button.dataset.rotorIndex);
     const delta = Number(button.dataset.positionDelta);
-    machine.positions[index] = (machine.positions[index] + delta + 26) % 26;
+    machine.positions[index] = (machine.positions[index] + delta + MODULUS) % MODULUS;
     machine.initialPositions = [...machine.positions];
     machine.history = "";
     machine.lastTrace = null;
@@ -885,7 +1170,7 @@ function bindEvents() {
     const input = event.target.closest("[data-reflector-pair]");
     if (!input) return;
 
-    input.value = input.value.toUpperCase().replace(/[^A-Z]/g, "").slice(0, 2);
+    input.value = cleanAlphabetSymbols(input.value).slice(0, 2);
     const pairs = [...elements.reflectorPairs.querySelectorAll("[data-reflector-pair]")]
       .map((pairInput) => pairInput.value);
     const reflector = validateCustomReflector(pairs);
@@ -906,6 +1191,31 @@ function bindEvents() {
     renderTrace();
   });
 
+  elements.clearReflectorPairs.addEventListener(
+    "click",
+    clearCustomReflectorPairs,
+  );
+
+  elements.addPlugboardPair.addEventListener("click", addPlugboardPair);
+  elements.useDefaultPlugboard.addEventListener("click", useDefaultPlugboard);
+  elements.clearPlugboard.addEventListener("click", clearPlugboard);
+
+  elements.plugboardConnections.addEventListener("change", (event) => {
+    const select = event.target.closest("[data-plugboard-pair]");
+    if (!select) return;
+    updatePlugboardPair(
+      Number(select.dataset.plugboardPair),
+      Number(select.dataset.plugboardSide),
+      select.value,
+    );
+  });
+
+  elements.plugboardConnections.addEventListener("click", (event) => {
+    const button = event.target.closest("[data-remove-plugboard]");
+    if (!button) return;
+    removePlugboardPair(Number(button.dataset.removePlugboard));
+  });
+
   document.addEventListener("keydown", (event) => {
     if (
       event.metaKey ||
@@ -915,21 +1225,24 @@ function bindEvents() {
     ) {
       return;
     }
-    const letter = event.key.toUpperCase();
-    if (ALPHABET.includes(letter)) {
+    const symbol = normalizeSymbol(event.key);
+    if (symbol) {
       event.preventDefault();
-      pressKey(letter);
+      pressKey(symbol);
     }
   });
 
   elements.plainText.addEventListener("input", () => {
-    const count = cleanLetters(elements.plainText.value).length;
-    elements.inputCount.textContent = `${count} letter${count === 1 ? "" : "s"}`;
+    const count = cleanMessageSymbols(elements.plainText.value).length;
+    const spaces = [...elements.plainText.value].filter((character) => character === " ").length;
+    elements.inputCount.textContent =
+      `${count} symbol${count === 1 ? "" : "s"}` +
+      (spaces ? ` · ${spaces} preserved space${spaces === 1 ? "" : "s"}` : "");
   });
 
   elements.encryptMessage.addEventListener("click", () => {
     const message = elements.plainText.value;
-    if (!cleanLetters(message)) {
+    if (!cleanMessageSymbols(message)) {
       elements.plainText.focus();
       return;
     }
@@ -960,7 +1273,7 @@ function bindEvents() {
     machine.history = "";
     machine.lastTrace = null;
     elements.plainText.value = "";
-    elements.inputCount.textContent = "0 letters";
+    elements.inputCount.textContent = "0 symbols";
     resetPositions(true);
   });
 
@@ -991,6 +1304,13 @@ function init() {
     "reflectorLabCopy",
     "reflectorValidity",
     "reflectorError",
+    "clearReflectorPairs",
+    "plugboardConnections",
+    "plugboardValidity",
+    "plugboardError",
+    "addPlugboardPair",
+    "useDefaultPlugboard",
+    "clearPlugboard",
     "lampboard",
     "keyboard",
     "plainText",
@@ -1035,6 +1355,7 @@ function init() {
   createRotorWindows();
   createCustomRotorEditor();
   createReflectorEditor();
+  createPlugboardEditor();
   createLetterBoard(elements.lampboard, false);
   createLetterBoard(elements.keyboard, true);
   updateRotorSelects();
